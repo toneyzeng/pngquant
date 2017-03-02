@@ -1,0 +1,22 @@
+[package]
+authors = ["Kornel Lesiński <kornel@geekhood.net>"]
+build = "build.rs"
+name = "pngquant"
+version = "0.1.0"
+
+[[bin]]
+name = "pngquant"
+path = "bin.rs"
+
+[build-dependencies]
+gcc = "0.3.43"
+pkg-config = "0.3.9"
+
+[dependencies.libimagequant-sys]
+path = "lib/"
+
+[features]
+default = ["sse", "lcms2", "static"]
+lcms2 = []
+static = []
+sse = ["libimagequant-sys/sse"]
