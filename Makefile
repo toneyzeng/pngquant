@@ -1,5 +1,6 @@
 -include config.mk
 
+LIQSRCDIR ?= lib
 BIN ?= pngquant
 BINPREFIX ?= $(DESTDIR)$(PREFIX)/bin
 MANPREFIX ?= $(DESTDIR)$(PREFIX)/share/man
@@ -11,48 +12,36 @@ ifeq (1, $(COCOA_READER))
 OBJS += $(COCOA_OBJS)
 endif
 
-STATICLIB = lib/libimagequant.a
-SHAREDLIB = lib/libimagequant.so
-
+STATICLIB = $(LIQSRCDIR)/libimagequant.a
 DISTFILES = *.[chm] pngquant.1 Makefile configure README.md INSTALL CHANGELOG COPYRIGHT
 TARNAME = pngquant-$(VERSION)
 TARFILE = $(TARNAME)-src.tar.gz
 
-LIBDISTFILES = lib/*.[ch] lib/COPYRIGHT lib/README.md lib/configure lib/Makefile
+LIBDISTFILES = $(LIQSRCDIR)/*.[ch] $(LIQSRCDIR)/COPYRIGHT $(LIQSRCDIR)/README.md $(LIQSRCDIR)/configure $(LIQSRCDIR)/Makefile
 
 TESTBIN = test/test
 
 all: $(BIN)
 
-ifeq ($(SHARED),1)
-  LIB=$(SHAREDLIB)
-else
-  LIB=$(STATICLIB)
-endif
+$(LIQSRCDIR)/config.mk: config.mk
+	( cd '$(LIQSRCDIR)'; ./configure $(LIQCONFIGUREFLAGS) )
 
-staticlib: $(STATICLIB)
-
-sharedlib: $(SHAREDLIB)
-
-$(STATICLIB): config.mk $(LIBDISTFILES)
-	$(MAKE) -C lib static
-
-$(SHAREDLIB): config.mk $(LIBDISTFILES)
-	$(MAKE) -C lib shared
+$(STATICLIB): $(LIQSRCDIR)/config.mk $(LIBDISTFILES)
+	$(MAKE) -C '$(LIQSRCDIR)' static
 
 $(OBJS): $(wildcard *.h) config.mk
 
 rwpng_cocoa.o: rwpng_cocoa.m
 	$(CC) -Wno-enum-conversion -c $(CFLAGS) -o $@ $< &> /dev/null || clang -Wno-enum-conversion -c -O3 -o $@ $<
 
-$(BIN): $(OBJS) $(LIB)
-	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
+$(BIN): $(OBJS) $(STATICLIBDEPS)
+	$(CC) $(OBJS) $(CFLAGS) $(LDFLAGS) -o $@
 
-$(TESTBIN): test/test.o $(LIB)
-	$(CC) $^ $(CFLAGS) $(LDFLAGS) -o $@
+$(TESTBIN): test/test.o $(STATICLIBDEPS)
+	$(CC) test/test.o $(CFLAGS) $(LDFLAGS) -o $@
 
 test: $(BIN) $(TESTBIN)
-	LD_LIBRARY_PATH="lib" ./test/test.sh ./test $(BIN) $(TESTBIN)
+	LD_LIBRARY_PATH='$(LIQSRCDIR)' ./test/test.sh ./test $(BIN) $(TESTBIN)
 
 dist: $(TARFILE)
 
@@ -76,20 +65,17 @@ uninstall:
 	rm -f '$(MANPREFIX)/man1/$(BIN).1'
 
 clean:
-	$(MAKE) -C lib clean
-	rm -f '$(BIN)' $(OBJS) $(COCOA_OBJS) $(STATICLIB) $(TARFILE)
+	-test -n '$(LIQSRCDIR)' && $(MAKE) -C '$(LIQSRCDIR)' clean
+	rm -f '$(BIN)' $(OBJS) $(COCOA_OBJS) $(TARFILE)
 
 distclean: clean
-	$(MAKE) -C lib distclean
+	-test -n '$(LIQSRCDIR)' && $(MAKE) -C '$(LIQSRCDIR)' distclean
 	rm -f config.mk pngquant-*-src.tar.gz
 
-config.mk: lib/libimagequant.h
+config.mk:
 ifeq ($(filter %clean %distclean, $(MAKECMDGOALS)), )
 	./configure
 endif
 
-lib/libimagequant.h:
-	git submodule init && git submodule update || true
-
-.PHONY: all clean dist distclean dll install uninstall test staticlib sharedlib
+.PHONY: all clean dist distclean dll install uninstall test
 .DELETE_ON_ERROR:
